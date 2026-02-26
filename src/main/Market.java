@@ -58,7 +58,10 @@ public class Market {
         System.out.println("Preço do produto: ");
         Double price = input.nextDouble();
 
-        Product product = new Product(name, price);
+        System.out.println("Quantidade em estoque: ");
+        int stock = input.nextInt();
+
+        Product product = new Product(name, price, stock);
         products.add(product);
 
         System.out.println(product.getName() + " cadastrado com sucesso");
@@ -92,17 +95,15 @@ public class Market {
 
             for (Product p : products) {
                 if (p.getId() == id) {
-                    int qtd = 0;
-                    try {
-                        qtd = cart.get(p);
-                        // check if the product is in the cart, increase quantity
-                        cart.put(p, qtd + 1);
-                    } catch (NullPointerException e) {
-                        //if the product is the first in cart, received 1
-                        cart.put(p, 1);
+                    int qtdNoCarrinho = cart.getOrDefault(p, 0);
+                    
+                    if (p.getStock() > qtdNoCarrinho) {
+                        cart.put(p, qtdNoCarrinho + 1);
+                        System.out.println(p.getName() + " adicionado ao carrinho.");
+                        isPresent = true;
+                    } else {
+                        System.out.println("Estoque insuficiente.");
                     }
-                    System.out.println(p.getName() + " adicionado ao carrinho.");
-                    isPresent = true;
 
                     if (isPresent) {
                         System.out.println("Deseja adicionar mais um produto?");
@@ -146,6 +147,7 @@ public class Market {
         for (Product p : cart.keySet()) {
             int qtd = cart.get(p);
             valueBuy += p.getPrice() * qtd;
+            p.setStock(p.getStock() - qtd);
             System.out.println(p);
             System.out.println("Quantidade: " + qtd);
         }

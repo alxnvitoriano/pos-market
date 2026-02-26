@@ -8,11 +8,13 @@ public class Product {
     private int id;
     private String name;
     private Double price;
+    private int stock;
 
-    public Product (String name, Double price) {
+    public Product (String name, Double price, int stock) {
         this.id = count;
         this.name = name;
         this.price = price;
+        this.stock = stock;
         Product.count += 1;
     }
 
@@ -36,9 +38,18 @@ public class Product {
         this.price = price;
     }
 
+    public int getStock() {
+        return stock;
+    }
+
+    public void setStock(int stock) {
+        this.stock = stock;
+    }
+
     public String toString() {
         return "Id: " + this.getId() +
                 "\nNome: " + this.getName() +
-                "\nPreco: " + Utils.doubleToString(this.getPrice());
+                "\nPreco: " + Utils.doubleToString(this.getPrice()) +
+                "\nEstoque: " + this.getStock();
     }
 }
