@@ -1,6 +1,7 @@
 package main;
 
 import model.Product;
+import utils.Utils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,7 +43,7 @@ public class Market {
                 break;
             case 5:
                 System.out.println("Volte Sempre!");
-                System.exit();
+                System.exit(0);
             default:
                 System.out.println("Opção Inválida.");
                 menu();
@@ -123,5 +124,34 @@ public class Market {
             System.out.println("Não existem produtos cadastrados.");
             menu();
         }
+    }
+
+    private static void seeCart(){
+        System.out.println("Produtos no seu carrinho: ");
+        if (!cart.isEmpty()) {
+            for (Product p : cart.keySet()) {
+                System.out.println("Produto: " + p + "\nQuantidade: " + cart.get(p));
+            }
+        } else {
+            System.out.println("Seu carrinho esta vazio");
+        }
+
+        menu();
+    }
+
+    private static void finishBuy () {
+        Double valueBuy = 0.0;
+        System.out.println("Seus produtos: ");
+
+        for (Product p : cart.keySet()) {
+            int qtd = cart.get(p);
+            valueBuy += p.getPrice() * qtd;
+            System.out.println(p);
+            System.out.println("Quantidade: " + qtd);
+        }
+        System.out.println("O valor da sua compra é: " + Utils.doubleToString(valueBuy));
+        cart.clear();
+        System.out.println("Obrigado pela preferencia!");
+        menu();
     }
 ;}
