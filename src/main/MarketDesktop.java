@@ -1,6 +1,7 @@
 package main;
 
 import model.Product;
+import model.PaymentMethod;
 import utils.Utils;
 
 import javax.swing.*;
@@ -14,10 +15,11 @@ public class MarketDesktop extends JFrame {
     private ArrayList<Product> products = new ArrayList<>();
     private Map<Product, Integer> cart = new HashMap<>();
 
-    // Componentes da Interface
+    // Interface components
     private DefaultTableModel productTableModel;
     private DefaultTableModel cartTableModel;
     private JLabel totalLabel;
+    private JTextField searchField;
 
     public MarketDesktop() {
         setTitle("Market PDV - Sistema Desktop");
@@ -38,8 +40,12 @@ public class MarketDesktop extends JFrame {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Formulário de Cadastro (Norte)
+        // Top section: Form and Search
+        JPanel topPanel = new JPanel(new GridLayout(1, 2, 10, 0));
+
+        // Register Form
         JPanel formPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        formPanel.setBorder(BorderFactory.createTitledBorder("Cadastrar Novo Produto"));
         JTextField nameField = new JTextField(15);
         JTextField priceField = new JTextField(10);
         JTextField stockField = new JTextField(5);
@@ -53,7 +59,17 @@ public class MarketDesktop extends JFrame {
         formPanel.add(stockField);
         formPanel.add(btnAdd);
 
-        // Tabela de Produtos (Centro)
+        // Search Panel
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.setBorder(BorderFactory.createTitledBorder("Buscar Produto"));
+        searchField = new JTextField(20);
+        searchPanel.add(new JLabel("Nome ou ID:"));
+        searchPanel.add(searchField);
+
+        topPanel.add(formPanel);
+        topPanel.add(searchPanel);
+
+        // Products Table (Center)
         String[] columns = {"ID", "Nome", "Preço", "Estoque"};
         productTableModel = new DefaultTableModel(columns, 0) {
             @Override
@@ -62,12 +78,12 @@ public class MarketDesktop extends JFrame {
         JTable productTable = new JTable(productTableModel);
         JScrollPane scrollPane = new JScrollPane(productTable);
 
-        // Botão Adicionar ao Carrinho (Sul)
+        // Add to cart Button
         JButton btnAddToCart = new JButton("Adicionar ao Carrinho");
         JPanel southPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         southPanel.add(btnAddToCart);
 
-        // Ações
+        // Actions
         btnAdd.addActionListener(e -> {
             try {
                 String name = nameField.getText();
@@ -85,36 +101,71 @@ public class MarketDesktop extends JFrame {
             }
         });
 
+        // Search Action
+        searchField.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                updateProductTable();
+            }
+        });
+
         btnAddToCart.addActionListener(e -> {
             int selectedRow = productTable.getSelectedRow();
             if (selectedRow != -1) {
-                Product p = products.get(selectedRow);
-                int qtdNoCarrinho = cart.getOrDefault(p, 0);
+                // Obter ID da coluna 0 da linha selecionada
+                int id = (int) productTable.getValueAt(selectedRow, 0);
+                Product p = findProductById(id);
                 
-                if (p.getStock() > qtdNoCarrinho) {
-                    cart.put(p, qtdNoCarrinho + 1);
-                    updateCartTable();
-                    JOptionPane.showMessageDialog(this, p.getName() + " adicionado ao carrinho!");
-                } else {
-                    JOptionPane.showMessageDialog(this, "Estoque insuficiente para este produto!", "Erro", JOptionPane.ERROR_MESSAGE);
+                if (p != null) {
+                    String response = JOptionPane.showInputDialog(this, "Quantidade de " + p.getName() + " que deseja adicionar:", "Adicionar ao Carrinho", JOptionPane.QUESTION_MESSAGE);
+                    
+                    if (response != null && !response.isEmpty()) {
+                        try {
+                            int requestedQuantity = Integer.parseInt(response);
+                            if (requestedQuantity <= 0) {
+                                JOptionPane.showMessageDialog(this, "A quantidade deve ser maior que zero!", "Erro", JOptionPane.ERROR_MESSAGE);
+                                return;
+                            }
+
+                            int qtdNoCarrinho = cart.getOrDefault(p, 0);
+                            
+                            if (p.getStock() >= (qtdNoCarrinho + requestedQuantity)) {
+                                cart.put(p, qtdNoCarrinho + requestedQuantity);
+                                updateCartTable();
+                                JOptionPane.showMessageDialog(this, requestedQuantity + " " + p.getName() + "(s) adicionado(s) ao carrinho!");
+                            } else {
+                                JOptionPane.showMessageDialog(this, "Estoque insuficiente para este produto!\nQuantidade disponível: " + (p.getStock() - qtdNoCarrinho), "Erro", JOptionPane.ERROR_MESSAGE);
+                            }
+                        } catch (NumberFormatException ex) {
+                            JOptionPane.showMessageDialog(this, "Quantidade inválida!", "Erro", JOptionPane.ERROR_MESSAGE);
+                        }
+                    }
                 }
             } else {
                 JOptionPane.showMessageDialog(this, "Selecione um produto na lista.");
             }
         });
 
-        panel.add(formPanel, BorderLayout.NORTH);
+        panel.add(topPanel, BorderLayout.NORTH);
         panel.add(scrollPane, BorderLayout.CENTER);
         panel.add(southPanel, BorderLayout.SOUTH);
 
         return panel;
     }
 
+    private Product findProductById(int id) {
+        for (Product p : products) {
+            if (p.getId() == id) {
+                return p;
+            }
+        }
+        return null;
+    }
+
     private JPanel createCartPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Tabela do Carrinho
+        // Cart table
         String[] columns = {"ID", "Produto", "Preço Unit.", "Qtd", "Subtotal"};
         cartTableModel = new DefaultTableModel(columns, 0) {
             @Override
@@ -123,7 +174,7 @@ public class MarketDesktop extends JFrame {
         JTable cartTable = new JTable(cartTableModel);
         JScrollPane scrollPane = new JScrollPane(cartTable);
 
-        // Resumo e Finalização (Sul)
+        // Finalization and resume
         JPanel footerPanel = new JPanel(new BorderLayout());
         totalLabel = new JLabel("Total: R$ 0,00");
         totalLabel.setFont(new Font("Arial", Font.BOLD, 18));
@@ -135,22 +186,44 @@ public class MarketDesktop extends JFrame {
         footerPanel.add(totalLabel, BorderLayout.WEST);
         footerPanel.add(btnFinish, BorderLayout.EAST);
 
-        // Ação Finalizar
+        // Finalization action
         btnFinish.addActionListener(e -> {
             if (cart.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Carrinho vazio!");
                 return;
             }
             double total = calculateTotal();
+
+            // Select payment method
+            PaymentMethod[] methods = PaymentMethod.values();
+            PaymentMethod selectedMethod = (PaymentMethod) JOptionPane.showInputDialog(
+                    this,
+                    "Total da Venda: " + Utils.doubleToString(total) + "\n\nSelecione o método de pagamento:",
+                    "Finalizar Venda",
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    methods,
+                    methods[0]
+            );
+
+            if (selectedMethod == null) {
+                return; // User cancelled
+            }
             
-            // Decrementar estoque
+            // Decrement management
             for (Map.Entry<Product, Integer> entry : cart.entrySet()) {
                 Product p = entry.getKey();
                 int qtdComprada = entry.getValue();
                 p.setStock(p.getStock() - qtdComprada);
             }
             
-            JOptionPane.showMessageDialog(this, "Compra finalizada!\nTotal: " + Utils.doubleToString(total));
+            JOptionPane.showMessageDialog(this, 
+                "Compra finalizada com sucesso!\n" +
+                "Método de Pagamento: " + selectedMethod.getDescription() + "\n" +
+                "Total: " + Utils.doubleToString(total),
+                "Venda Concluída",
+                JOptionPane.INFORMATION_MESSAGE);
+                
             cart.clear();
             updateCartTable();
             updateProductTable(); // Atualiza a lista de produtos com o novo estoque
@@ -165,8 +238,19 @@ public class MarketDesktop extends JFrame {
 
     private void updateProductTable() {
         productTableModel.setRowCount(0);
+        String query = (searchField != null) ? searchField.getText().toLowerCase().trim() : "";
+
         for (Product p : products) {
-            productTableModel.addRow(new Object[]{p.getId(), p.getName(), Utils.doubleToString(p.getPrice()), p.getStock()});
+            boolean matches = true;
+            if (!query.isEmpty()) {
+                String idStr = String.valueOf(p.getId());
+                String name = p.getName().toLowerCase();
+                matches = idStr.contains(query) || name.contains(query);
+            }
+
+            if (matches) {
+                productTableModel.addRow(new Object[]{p.getId(), p.getName(), Utils.doubleToString(p.getPrice()), p.getStock()});
+            }
         }
     }
 
