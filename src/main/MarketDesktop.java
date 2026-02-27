@@ -3,6 +3,7 @@ package main;
 import model.Product;
 import model.PaymentMethod;
 import model.Sale;
+import model.Expense;
 import utils.Utils;
 
 import javax.swing.*;
@@ -19,13 +20,16 @@ public class MarketDesktop extends JFrame {
     private ArrayList<Product> products = new ArrayList<>();
     private Map<Product, Integer> cart = new HashMap<>();
     private ArrayList<Sale> sales = new ArrayList<>();
+    private ArrayList<Expense> expenses = new ArrayList<>();
 
     // Interface components
     private DefaultTableModel productTableModel;
     private DefaultTableModel cartTableModel;
     private DefaultTableModel salesTableModel;
+    private DefaultTableModel expenseTableModel;
     private JLabel totalLabel;
     private JLabel totalSalesLabel;
+    private JLabel totalExpensesLabel;
     private JTextField searchField;
     
     // Filtros de data
@@ -46,6 +50,7 @@ public class MarketDesktop extends JFrame {
         tabbedPane.addTab("Cadastrar/Listar", createProductPanel());
         tabbedPane.addTab("Efetuar Venda", createCartPanel());
         tabbedPane.addTab("Gerenciamento de Entradas", createSalesPanel());
+        tabbedPane.addTab("Gerenciamento de Saídas", createExpensePanel());
 
         add(tabbedPane);
     }
@@ -516,6 +521,113 @@ public class MarketDesktop extends JFrame {
             }
         }
         totalSalesLabel.setText("Total Acumulado em Vendas: " + Utils.doubleToString(accumulatedTotal));
+    }
+
+    private JPanel createExpensePanel() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Form Panel
+        JPanel formPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        formPanel.setBorder(BorderFactory.createTitledBorder("Cadastrar Nova Saída"));
+
+        String[] types = {"VALE FUNCIONARIO", "DIARIA", "COMPRA DE MERCADORIA"};
+        JComboBox<String> typeCombo = new JComboBox<>(types);
+        JTextField descriptionField = new JTextField(15);
+        JTextField valueField = new JTextField(10);
+        JButton btnAdd = new JButton("Cadastrar Saída");
+
+        JLabel descriptionLabel = new JLabel("Nome Funcionário:");
+        
+        // Listener to change label based on type
+        typeCombo.addActionListener(e -> {
+            String selected = (String) typeCombo.getSelectedItem();
+            if ("VALE FUNCIONARIO".equals(selected)) {
+                descriptionLabel.setText("Nome Funcionário:");
+                descriptionField.setEnabled(true);
+            } else {
+                descriptionLabel.setText("Descrição:");
+                descriptionField.setEnabled(true);
+            }
+        });
+
+        formPanel.add(new JLabel("Tipo:"));
+        formPanel.add(typeCombo);
+        formPanel.add(descriptionLabel);
+        formPanel.add(descriptionField);
+        formPanel.add(new JLabel("Valor:"));
+        formPanel.add(valueField);
+        formPanel.add(btnAdd);
+
+        // Expense Table
+        String[] columns = {"TIPO", "DESCRIÇÃO/FUNCIONÁRIO", "VALOR", "DATA"};
+        expenseTableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
+        };
+        JTable expenseTable = new JTable(expenseTableModel);
+        JScrollPane scrollPane = new JScrollPane(expenseTable);
+
+        // Summary panel
+        JPanel summaryPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        totalExpensesLabel = new JLabel("Total de Saídas: R$ 0,00");
+        totalExpensesLabel.setFont(new Font("Arial", Font.BOLD, 16));
+        summaryPanel.add(totalExpensesLabel);
+
+        // Action
+        btnAdd.addActionListener(e -> {
+            try {
+                String type = (String) typeCombo.getSelectedItem();
+                String description = descriptionField.getText().trim();
+                String valueStr = valueField.getText().replace(",", ".");
+                
+                if (valueStr.isEmpty()) {
+                    JOptionPane.showMessageDialog(this, "Informe o valor!", "Erro", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                double value = Double.parseDouble(valueStr);
+                
+                if ("VALE FUNCIONARIO".equals(type) && description.isEmpty()) {
+                    JOptionPane.showMessageDialog(this, "Informe o nome do funcionário!", "Erro", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                Expense expense = new Expense(type, description, value);
+                expenses.add(expense);
+                updateExpenseTable();
+                
+                descriptionField.setText("");
+                valueField.setText("");
+                JOptionPane.showMessageDialog(this, "Saída registrada com sucesso!");
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Valor inválido!", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        panel.add(formPanel, BorderLayout.NORTH);
+        panel.add(scrollPane, BorderLayout.CENTER);
+        panel.add(summaryPanel, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private void updateExpenseTable() {
+        if (expenseTableModel == null) return;
+        expenseTableModel.setRowCount(0);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+        double total = 0;
+
+        for (Expense e : expenses) {
+            total += e.getValue();
+            expenseTableModel.addRow(new Object[]{
+                    e.getType(),
+                    e.getDescription(),
+                    Utils.doubleToString(e.getValue()),
+                    e.getDateTime().format(formatter)
+            });
+        }
+        totalExpensesLabel.setText("Total de Saídas: " + Utils.doubleToString(total));
     }
 
     private void updateProductTable() {

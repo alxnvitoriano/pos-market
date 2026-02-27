@@ -3,6 +3,10 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 .kotlin
+# Adicione estas linhas ao seu .gitignore se elas não existirem:
+
+*.class
+main/
 
 ### Eclipse ###
 .apt_generated
