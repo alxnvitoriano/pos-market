@@ -2,11 +2,13 @@ package main;
 
 import model.Product;
 import model.PaymentMethod;
+import model.Sale;
 import utils.Utils;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -14,11 +16,14 @@ import java.util.Map;
 public class MarketDesktop extends JFrame {
     private ArrayList<Product> products = new ArrayList<>();
     private Map<Product, Integer> cart = new HashMap<>();
+    private ArrayList<Sale> sales = new ArrayList<>();
 
     // Interface components
     private DefaultTableModel productTableModel;
     private DefaultTableModel cartTableModel;
+    private DefaultTableModel salesTableModel;
     private JLabel totalLabel;
+    private JLabel totalSalesLabel;
     private JTextField searchField;
 
     public MarketDesktop() {
@@ -31,9 +36,18 @@ public class MarketDesktop extends JFrame {
 
         // Abas
         tabbedPane.addTab("Cadastrar/Listar", createProductPanel());
-        tabbedPane.addTab("Carrinho de Compras", createCartPanel());
+        tabbedPane.addTab("Efetuar Venda", createCartPanel());
+        tabbedPane.addTab("Gerenciamento de Entradas", createSalesPanel());
 
         add(tabbedPane);
+
+        // Adicionar alguns produtos iniciais para teste
+        products.add(new Product("Arroz 5kg", 25.50, 50));
+        products.add(new Product("Feijão 1kg", 8.90, 100));
+        products.add(new Product("Óleo de Soja", 6.50, 40));
+        products.add(new Product("Açúcar 1kg", 4.20, 60));
+        products.add(new Product("Leite 1L", 5.30, 80));
+        updateProductTable();
     }
 
     private JPanel createProductPanel() {
@@ -294,7 +308,12 @@ public class MarketDesktop extends JFrame {
                 int qtdComprada = entry.getValue();
                 p.setStock(p.getStock() - qtdComprada);
             }
-            
+
+            // Create and save sale
+            Sale sale = new Sale(new HashMap<>(cart), total, selectedMethod);
+            sales.add(sale);
+            updateSalesTable();
+
             JOptionPane.showMessageDialog(this, 
                 "Compra finalizada com sucesso!\n" +
                 "Método de Pagamento: " + selectedMethod.getDescription() + "\n" +
@@ -312,6 +331,50 @@ public class MarketDesktop extends JFrame {
         panel.add(footerPanel, BorderLayout.SOUTH);
 
         return panel;
+    }
+
+    private JPanel createSalesPanel() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Sales table
+        String[] columns = {"PRODUTO (S)", "VALOR TOTAL", "MÉTODO DE PAGAMENTO", "DATA"};
+        salesTableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
+        };
+        JTable salesTable = new JTable(salesTableModel);
+        JScrollPane scrollPane = new JScrollPane(salesTable);
+
+        // Summary panel
+        JPanel summaryPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        totalSalesLabel = new JLabel("Total Acumulado em Vendas: R$ 0,00");
+        totalSalesLabel.setFont(new Font("Arial", Font.BOLD, 16));
+        summaryPanel.add(totalSalesLabel);
+
+        panel.add(new JLabel("Histórico de Vendas (Saídas):"), BorderLayout.NORTH);
+        panel.add(scrollPane, BorderLayout.CENTER);
+        panel.add(summaryPanel, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private void updateSalesTable() {
+        if (salesTableModel == null) return;
+        salesTableModel.setRowCount(0);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+        double accumulatedTotal = 0;
+
+        for (Sale sale : sales) {
+            accumulatedTotal += sale.getTotalValue();
+            salesTableModel.addRow(new Object[]{
+                    sale.getProductsSummary(),
+                    Utils.doubleToString(sale.getTotalValue()),
+                    sale.getPaymentMethod().getDescription(),
+                    sale.getDateTime().format(formatter)
+            });
+        }
+        totalSalesLabel.setText("Total Acumulado em Vendas: " + Utils.doubleToString(accumulatedTotal));
     }
 
     private void updateProductTable() {
