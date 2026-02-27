@@ -8,7 +8,9 @@ import utils.Utils;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -25,6 +27,12 @@ public class MarketDesktop extends JFrame {
     private JLabel totalLabel;
     private JLabel totalSalesLabel;
     private JTextField searchField;
+    
+    // Filtros de data
+    private JTextField startDateSalesField;
+    private JTextField endDateSalesField;
+    private JTextField startDateCartField;
+    private JTextField endDateCartField;
 
     public MarketDesktop() {
         setTitle("VTN POS");
@@ -40,14 +48,6 @@ public class MarketDesktop extends JFrame {
         tabbedPane.addTab("Gerenciamento de Entradas", createSalesPanel());
 
         add(tabbedPane);
-
-        // Adicionar alguns produtos iniciais para teste
-        products.add(new Product("Arroz 5kg", 25.50, 50));
-        products.add(new Product("Feijão 1kg", 8.90, 100));
-        products.add(new Product("Óleo de Soja", 6.50, 40));
-        products.add(new Product("Açúcar 1kg", 4.20, 60));
-        products.add(new Product("Leite 1L", 5.30, 80));
-        updateProductTable();
     }
 
     private JPanel createProductPanel() {
@@ -176,8 +176,12 @@ public class MarketDesktop extends JFrame {
     }
 
     private JPanel createCartPanel() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // --- TOP: Cart Section ---
+        JPanel cartPanel = new JPanel(new BorderLayout(5, 5));
+        cartPanel.setBorder(BorderFactory.createTitledBorder("Carrinho Atual"));
 
         // Cart table
         String[] columns = {"ID", "Produto", "Preço Unit.", "Qtd", "Subtotal"};
@@ -186,7 +190,7 @@ public class MarketDesktop extends JFrame {
             public boolean isCellEditable(int row, int column) { return false; }
         };
         JTable cartTable = new JTable(cartTableModel);
-        JScrollPane scrollPane = new JScrollPane(cartTable);
+        JScrollPane cartScrollPane = new JScrollPane(cartTable);
 
         // Finalization and resume
         JPanel footerPanel = new JPanel(new BorderLayout());
@@ -209,7 +213,58 @@ public class MarketDesktop extends JFrame {
         footerPanel.add(totalLabel, BorderLayout.WEST);
         footerPanel.add(actionsPanel, BorderLayout.EAST);
 
-        // Remove item action
+        cartPanel.add(cartScrollPane, BorderLayout.CENTER);
+        cartPanel.add(footerPanel, BorderLayout.SOUTH);
+
+        // --- BOTTOM: Quick History Section ---
+        JPanel historyPanel = new JPanel(new BorderLayout(5, 5));
+        historyPanel.setBorder(BorderFactory.createTitledBorder("Vendas Recentes"));
+
+        // Filter for quick history
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        startDateCartField = new JTextField(8);
+        endDateCartField = new JTextField(8);
+        JButton btnFilterCart = new JButton("Filtrar");
+        JButton btnClearCart = new JButton("Limpar");
+        
+        filterPanel.add(new JLabel("De:"));
+        filterPanel.add(startDateCartField);
+        filterPanel.add(new JLabel("Até:"));
+        filterPanel.add(endDateCartField);
+        filterPanel.add(btnFilterCart);
+        filterPanel.add(btnClearCart);
+
+        String[] historyColumns = {"DATA", "TOTAL", "PAGAMENTO"};
+        DefaultTableModel quickSalesTableModel = new DefaultTableModel(historyColumns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
+        };
+        JTable quickSalesTable = new JTable(quickSalesTableModel);
+        JScrollPane historyScrollPane = new JScrollPane(quickSalesTable);
+        historyScrollPane.setPreferredSize(new Dimension(0, 150));
+
+        historyPanel.add(filterPanel, BorderLayout.NORTH);
+        historyPanel.add(historyScrollPane, BorderLayout.CENTER);
+
+        // Split Pane
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, cartPanel, historyPanel);
+        splitPane.setResizeWeight(0.7);
+        mainPanel.add(splitPane, BorderLayout.CENTER);
+
+        // Actions
+        btnFilterCart.addActionListener(e -> updateQuickSalesTable(quickSalesTableModel));
+        btnClearCart.addActionListener(e -> {
+            startDateCartField.setText("");
+            endDateCartField.setText("");
+            updateQuickSalesTable(quickSalesTableModel);
+        });
+        
+        // Inicializar tabela de vendas recentes
+        updateQuickSalesTable(quickSalesTableModel);
+
+        // ... (Keep existing actions for btnRemove and btnFinish)
+        
+        // --- Actions Implementation (Existing) ---
         btnRemove.addActionListener(e -> {
             int selectedRow = cartTable.getSelectedRow();
             if (selectedRow != -1) {
@@ -268,7 +323,6 @@ public class MarketDesktop extends JFrame {
                         }
                     }
                 } else {
-                    // Se houver apenas 1 unidade, remove direto sem perguntar
                     cart.remove(p);
                     updateCartTable();
                     JOptionPane.showMessageDialog(this, "Item '" + name + "' removido com sucesso!");
@@ -278,7 +332,6 @@ public class MarketDesktop extends JFrame {
             }
         });
 
-        // Finalization action
         btnFinish.addActionListener(e -> {
             if (cart.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Carrinho vazio!");
@@ -286,7 +339,6 @@ public class MarketDesktop extends JFrame {
             }
             double total = calculateTotal();
 
-            // Select payment method
             PaymentMethod[] methods = PaymentMethod.values();
             PaymentMethod selectedMethod = (PaymentMethod) JOptionPane.showInputDialog(
                     this,
@@ -299,20 +351,19 @@ public class MarketDesktop extends JFrame {
             );
 
             if (selectedMethod == null) {
-                return; // User cancelled
+                return;
             }
             
-            // Decrement management
             for (Map.Entry<Product, Integer> entry : cart.entrySet()) {
                 Product p = entry.getKey();
                 int qtdComprada = entry.getValue();
                 p.setStock(p.getStock() - qtdComprada);
             }
 
-            // Create and save sale
             Sale sale = new Sale(new HashMap<>(cart), total, selectedMethod);
             sales.add(sale);
             updateSalesTable();
+            updateQuickSalesTable(quickSalesTableModel); // Update the quick history table
 
             JOptionPane.showMessageDialog(this, 
                 "Compra finalizada com sucesso!\n" +
@@ -323,19 +374,69 @@ public class MarketDesktop extends JFrame {
                 
             cart.clear();
             updateCartTable();
-            updateProductTable(); // Atualiza a lista de produtos com o novo estoque
+            updateProductTable();
         });
 
-        panel.add(new JLabel("Itens no Carrinho:"), BorderLayout.NORTH);
-        panel.add(scrollPane, BorderLayout.CENTER);
-        panel.add(footerPanel, BorderLayout.SOUTH);
+        return mainPanel;
+    }
 
-        return panel;
+    private void updateQuickSalesTable(DefaultTableModel model) {
+        if (model == null) return;
+        model.setRowCount(0);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        DateTimeFormatter dateOnlyFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+        LocalDate startDate = null;
+        LocalDate endDate = null;
+
+        try {
+            if (startDateCartField != null && !startDateCartField.getText().trim().isEmpty()) {
+                startDate = LocalDate.parse(startDateCartField.getText().trim(), dateOnlyFormatter);
+            }
+            if (endDateCartField != null && !endDateCartField.getText().trim().isEmpty()) {
+                endDate = LocalDate.parse(endDateCartField.getText().trim(), dateOnlyFormatter);
+            }
+        } catch (DateTimeParseException ex) {
+            JOptionPane.showMessageDialog(this, "Formato de data inválido! Use dd/mm/aaaa", "Erro", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        for (Sale sale : sales) {
+            LocalDate saleDate = sale.getDateTime().toLocalDate();
+            boolean matches = true;
+
+            if (startDate != null && saleDate.isBefore(startDate)) matches = false;
+            if (endDate != null && saleDate.isAfter(endDate)) matches = false;
+
+            if (matches) {
+                model.addRow(new Object[]{
+                        sale.getDateTime().format(formatter),
+                        Utils.doubleToString(sale.getTotalValue()),
+                        sale.getPaymentMethod().getDescription()
+                });
+            }
+        }
     }
 
     private JPanel createSalesPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Filter panel
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        filterPanel.setBorder(BorderFactory.createTitledBorder("Filtrar por Data"));
+        
+        startDateSalesField = new JTextField(10);
+        endDateSalesField = new JTextField(10);
+        JButton btnFilter = new JButton("Filtrar");
+        JButton btnClear = new JButton("Limpar");
+
+        filterPanel.add(new JLabel("Início (dd/mm/aaaa):"));
+        filterPanel.add(startDateSalesField);
+        filterPanel.add(new JLabel("Fim (dd/mm/aaaa):"));
+        filterPanel.add(endDateSalesField);
+        filterPanel.add(btnFilter);
+        filterPanel.add(btnClear);
 
         // Sales table
         String[] columns = {"PRODUTO (S)", "VALOR TOTAL", "MÉTODO DE PAGAMENTO", "DATA"};
@@ -352,7 +453,19 @@ public class MarketDesktop extends JFrame {
         totalSalesLabel.setFont(new Font("Arial", Font.BOLD, 16));
         summaryPanel.add(totalSalesLabel);
 
-        panel.add(new JLabel("Histórico de Vendas (Saídas):"), BorderLayout.NORTH);
+        // Actions
+        btnFilter.addActionListener(e -> updateSalesTable());
+        btnClear.addActionListener(e -> {
+            startDateSalesField.setText("");
+            endDateSalesField.setText("");
+            updateSalesTable();
+        });
+
+        JPanel northPanel = new JPanel(new BorderLayout());
+        northPanel.add(new JLabel("Histórico de Vendas (Saídas):"), BorderLayout.NORTH);
+        northPanel.add(filterPanel, BorderLayout.CENTER);
+
+        panel.add(northPanel, BorderLayout.NORTH);
         panel.add(scrollPane, BorderLayout.CENTER);
         panel.add(summaryPanel, BorderLayout.SOUTH);
 
@@ -363,16 +476,44 @@ public class MarketDesktop extends JFrame {
         if (salesTableModel == null) return;
         salesTableModel.setRowCount(0);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+        DateTimeFormatter dateOnlyFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
         double accumulatedTotal = 0;
 
+        LocalDate startDate = null;
+        LocalDate endDate = null;
+
+        try {
+            if (startDateSalesField != null && !startDateSalesField.getText().trim().isEmpty()) {
+                startDate = LocalDate.parse(startDateSalesField.getText().trim(), dateOnlyFormatter);
+            }
+            if (endDateSalesField != null && !endDateSalesField.getText().trim().isEmpty()) {
+                endDate = LocalDate.parse(endDateSalesField.getText().trim(), dateOnlyFormatter);
+            }
+        } catch (DateTimeParseException ex) {
+            JOptionPane.showMessageDialog(this, "Formato de data inválido! Use dd/mm/aaaa", "Erro", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
         for (Sale sale : sales) {
-            accumulatedTotal += sale.getTotalValue();
-            salesTableModel.addRow(new Object[]{
-                    sale.getProductsSummary(),
-                    Utils.doubleToString(sale.getTotalValue()),
-                    sale.getPaymentMethod().getDescription(),
-                    sale.getDateTime().format(formatter)
-            });
+            LocalDate saleDate = sale.getDateTime().toLocalDate();
+            boolean matches = true;
+
+            if (startDate != null && saleDate.isBefore(startDate)) {
+                matches = false;
+            }
+            if (endDate != null && saleDate.isAfter(endDate)) {
+                matches = false;
+            }
+
+            if (matches) {
+                accumulatedTotal += sale.getTotalValue();
+                salesTableModel.addRow(new Object[]{
+                        sale.getProductsSummary(),
+                        Utils.doubleToString(sale.getTotalValue()),
+                        sale.getPaymentMethod().getDescription(),
+                        sale.getDateTime().format(formatter)
+                });
+            }
         }
         totalSalesLabel.setText("Total Acumulado em Vendas: " + Utils.doubleToString(accumulatedTotal));
     }
