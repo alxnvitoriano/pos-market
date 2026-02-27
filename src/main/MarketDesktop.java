@@ -22,7 +22,7 @@ public class MarketDesktop extends JFrame {
     private JTextField searchField;
 
     public MarketDesktop() {
-        setTitle("Market PDV - Sistema Desktop");
+        setTitle("VTN POS");
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -179,12 +179,90 @@ public class MarketDesktop extends JFrame {
         totalLabel = new JLabel("Total: R$ 0,00");
         totalLabel.setFont(new Font("Arial", Font.BOLD, 18));
         
+        JPanel actionsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
+        JButton btnRemove = new JButton("Remover Item");
+        btnRemove.setBackground(new Color(220, 53, 69));
+        btnRemove.setForeground(Color.WHITE);
+
         JButton btnFinish = new JButton("Finalizar Compra");
         btnFinish.setBackground(new Color(46, 139, 87));
         btnFinish.setForeground(Color.WHITE);
 
+        actionsPanel.add(btnRemove);
+        actionsPanel.add(btnFinish);
+
         footerPanel.add(totalLabel, BorderLayout.WEST);
-        footerPanel.add(btnFinish, BorderLayout.EAST);
+        footerPanel.add(actionsPanel, BorderLayout.EAST);
+
+        // Remove item action
+        btnRemove.addActionListener(e -> {
+            int selectedRow = cartTable.getSelectedRow();
+            if (selectedRow != -1) {
+                int id = (int) cartTable.getValueAt(selectedRow, 0);
+                String name = (String) cartTable.getValueAt(selectedRow, 1);
+                int currentQty = (int) cartTable.getValueAt(selectedRow, 3);
+                
+                Product p = null;
+                for (Product cartProduct : cart.keySet()) {
+                    if (cartProduct.getId() == id) {
+                        p = cartProduct;
+                        break;
+                    }
+                }
+                
+                if (p == null) return;
+
+                if (currentQty > 1) {
+                    String[] options = {"Remover Tudo", "Remover Quantidade Específica", "Cancelar"};
+                    int choice = JOptionPane.showOptionDialog(this,
+                            "O item '" + name + "' possui " + currentQty + " unidades no carrinho.\nO que deseja fazer?",
+                            "Remover Item",
+                            JOptionPane.DEFAULT_OPTION,
+                            JOptionPane.QUESTION_MESSAGE,
+                            null,
+                            options,
+                            options[0]);
+
+                    if (choice == 0) { // Remover Tudo
+                        cart.remove(p);
+                        updateCartTable();
+                        JOptionPane.showMessageDialog(this, "Item '" + name + "' removido completamente.");
+                    } else if (choice == 1) { // Quantidade Específica
+                        String response = JOptionPane.showInputDialog(this, 
+                                "Quantidade atual: " + currentQty + "\nQuantas unidades deseja remover?", 
+                                "Remover Parcialmente", 
+                                JOptionPane.QUESTION_MESSAGE);
+                        
+                        if (response != null && !response.isEmpty()) {
+                            try {
+                                int qtyToRemove = Integer.parseInt(response);
+                                if (qtyToRemove <= 0) {
+                                    JOptionPane.showMessageDialog(this, "A quantidade deve ser maior que zero!", "Erro", JOptionPane.ERROR_MESSAGE);
+                                } else if (qtyToRemove >= currentQty) {
+                                    cart.remove(p);
+                                    updateCartTable();
+                                    JOptionPane.showMessageDialog(this, "Todas as unidades de '" + name + "' foram removidas.");
+                                } else {
+                                    cart.put(p, currentQty - qtyToRemove);
+                                    updateCartTable();
+                                    JOptionPane.showMessageDialog(this, qtyToRemove + " unidade(s) de '" + name + "' removida(s).");
+                                }
+                            } catch (NumberFormatException ex) {
+                                JOptionPane.showMessageDialog(this, "Quantidade inválida!", "Erro", JOptionPane.ERROR_MESSAGE);
+                            }
+                        }
+                    }
+                } else {
+                    // Se houver apenas 1 unidade, remove direto sem perguntar
+                    cart.remove(p);
+                    updateCartTable();
+                    JOptionPane.showMessageDialog(this, "Item '" + name + "' removido com sucesso!");
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, "Selecione um item no carrinho para remover.");
+            }
+        });
 
         // Finalization action
         btnFinish.addActionListener(e -> {
