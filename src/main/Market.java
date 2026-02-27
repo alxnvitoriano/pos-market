@@ -1,6 +1,7 @@
 package main;
 
 import model.Product;
+import model.PaymentMethod;
 import utils.Utils;
 
 import java.util.ArrayList;
@@ -83,43 +84,73 @@ public class Market {
     }
 
     private static void buyProducts() {
-        if(!products.isEmpty()) {
-            System.out.println("Código do produtos: \n");
-
+        if (!products.isEmpty()) {
             System.out.println("Produtos disponiveis:");
             for (Product p : products) {
                 System.out.println(p + "\n");
             }
-            int id = Integer.parseInt(input.next());
-            boolean isPresent = false;
 
+            System.out.println("Digite o código do produto: ");
+            int id;
+            try {
+                id = Integer.parseInt(input.next());
+            } catch (NumberFormatException e) {
+                System.out.println("Código inválido.");
+                menu();
+                return;
+            }
+
+            Product product = null;
             for (Product p : products) {
                 if (p.getId() == id) {
-                    int qtdNoCarrinho = cart.getOrDefault(p, 0);
+                    product = p;
+                    break;
+                }
+            }
+
+            if (product != null) {
+                System.out.println("Quantidade que deseja adicionar: ");
+                int requestedQuantity;
+                try {
+                    requestedQuantity = Integer.parseInt(input.next());
+                    if (requestedQuantity <= 0) {
+                        System.out.println("A quantidade deve ser maior que zero.");
+                        buyProducts();
+                        return;
+                    }
+                } catch (NumberFormatException e) {
+                    System.out.println("Quantidade inválida.");
+                    buyProducts();
+                    return;
+                }
+
+                int qtdNoCarrinho = cart.getOrDefault(product, 0);
+
+                if (product.getStock() >= (qtdNoCarrinho + requestedQuantity)) {
+                    cart.put(product, qtdNoCarrinho + requestedQuantity);
+                    System.out.println(requestedQuantity + " " + product.getName() + "(s) adicionado(s) ao carrinho.");
                     
-                    if (p.getStock() > qtdNoCarrinho) {
-                        cart.put(p, qtdNoCarrinho + 1);
-                        System.out.println(p.getName() + " adicionado ao carrinho.");
-                        isPresent = true;
-                    } else {
-                        System.out.println("Estoque insuficiente.");
+                    System.out.println("Deseja adicionar mais um produto?");
+                    System.out.println("Digite 1 para sim, ou 0 para finalizar a compra.");
+                    int option = 0;
+                    try {
+                        option = Integer.parseInt(input.next());
+                    } catch (NumberFormatException e) {
+                        // Se for inválido, finaliza a compra por segurança ou volta ao menu
                     }
 
-                    if (isPresent) {
-                        System.out.println("Deseja adicionar mais um produto?");
-                        System.out.println("Digite 1 para sim, ou 0 para finalizar a compra.");
-                        int option = Integer.parseInt(input.next());
-
-                        if (option == 1) {
-                            buyProducts();
-                        } else {
-                            finishBuy();
-                        }
+                    if (option == 1) {
+                        buyProducts();
+                    } else {
+                        finishBuy();
                     }
                 } else {
-                    System.out.println("Produto não encontrado.");
-                    menu();
+                    System.out.println("Estoque insuficiente. Quantidade disponível: " + (product.getStock() - qtdNoCarrinho));
+                    buyProducts();
                 }
+            } else {
+                System.out.println("Produto não encontrado.");
+                menu();
             }
         } else {
             System.out.println("Não existem produtos cadastrados.");
@@ -147,13 +178,48 @@ public class Market {
         for (Product p : cart.keySet()) {
             int qtd = cart.get(p);
             valueBuy += p.getPrice() * qtd;
-            p.setStock(p.getStock() - qtd);
             System.out.println(p);
             System.out.println("Quantidade: " + qtd);
         }
-        System.out.println("O valor da sua compra é: " + Utils.doubleToString(valueBuy));
+
+        System.out.println("\nO valor da sua compra é: " + Utils.doubleToString(valueBuy));
+        
+        System.out.println("\nSelecione o método de pagamento:");
+        PaymentMethod[] methods = PaymentMethod.values();
+        for (int i = 0; i < methods.length; i++) {
+            System.out.println((i + 1) + " - " + methods[i].getDescription());
+        }
+
+        int methodOption = 0;
+        try {
+            methodOption = Integer.parseInt(input.next());
+        } catch (NumberFormatException e) {
+            System.out.println("Opção inválida. Operação cancelada.");
+            menu();
+            return;
+        }
+
+        if (methodOption < 1 || methodOption > methods.length) {
+            System.out.println("Opção inválida. Operação cancelada.");
+            menu();
+            return;
+        }
+
+        PaymentMethod selectedMethod = methods[methodOption - 1];
+
+        // Decrement stock only after payment method is selected
+        for (Map.Entry<Product, Integer> entry : cart.entrySet()) {
+            Product p = entry.getKey();
+            int qtd = entry.getValue();
+            p.setStock(p.getStock() - qtd);
+        }
+
+        System.out.println("\nCompra finalizada com sucesso!");
+        System.out.println("Método de Pagamento: " + selectedMethod.getDescription());
+        System.out.println("Total: " + Utils.doubleToString(valueBuy));
+        
         cart.clear();
-        System.out.println("Obrigado pela preferencia!");
+        System.out.println("\nObrigado pela preferencia!");
         menu();
     }
 ;}
