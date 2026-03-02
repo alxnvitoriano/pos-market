@@ -32,7 +32,7 @@ public class MarketDesktop extends JFrame {
     private JLabel totalExpensesLabel;
     private JTextField searchField;
     
-    // Filtros de data
+    // Data filter
     private JTextField startDateSalesField;
     private JTextField endDateSalesField;
     private JTextField startDateCartField;
@@ -46,7 +46,7 @@ public class MarketDesktop extends JFrame {
 
         JTabbedPane tabbedPane = new JTabbedPane();
 
-        // Abas
+        // Tabs
         tabbedPane.addTab("Cadastrar/Listar", createProductPanel());
         tabbedPane.addTab("Efetuar Venda", createCartPanel());
         tabbedPane.addTab("Gerenciamento de Entradas", createSalesPanel());
@@ -264,7 +264,7 @@ public class MarketDesktop extends JFrame {
             updateQuickSalesTable(quickSalesTableModel);
         });
         
-        // Inicializar tabela de vendas recentes
+        // start table of recent sales
         updateQuickSalesTable(quickSalesTableModel);
 
         // ... (Keep existing actions for btnRemove and btnFinish)
@@ -298,11 +298,11 @@ public class MarketDesktop extends JFrame {
                             options,
                             options[0]);
 
-                    if (choice == 0) { // Remover Tudo
+                    if (choice == 0) { // Remove Everything
                         cart.remove(p);
                         updateCartTable();
                         JOptionPane.showMessageDialog(this, "Item '" + name + "' removido completamente.");
-                    } else if (choice == 1) { // Quantidade Específica
+                    } else if (choice == 1) { // Specificity quantity
                         String response = JOptionPane.showInputDialog(this, 
                                 "Quantidade atual: " + currentQty + "\nQuantas unidades deseja remover?", 
                                 "Remover Parcialmente", 
